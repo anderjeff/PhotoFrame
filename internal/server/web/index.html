@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhotoFrame</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>PhotoFrame</h1>
+  <div id="frame-pill" class="pill offline" title="">Frame: connecting…</div>
+  <div id="summary" class="muted"></div>
+</header>
+
+<nav>
+  <button class="tab active" data-tab="photos">Photos</button>
+  <button class="tab" data-tab="frame">Frame</button>
+  <button class="tab" data-tab="logs">Logs</button>
+</nav>
+
+<main>
+  <!-- PHOTOS -->
+  <section id="tab-photos" class="panel active">
+    <label id="drop" class="drop">
+      <input id="file-input" type="file" accept="image/*,.heic,.heif" multiple hidden>
+      <strong>Drop photos here</strong> or click to choose. Hundreds at once is fine.
+    </label>
+
+    <div id="upload-panel" class="card hidden">
+      <div class="row">
+        <span id="upload-text"></span>
+        <span class="spacer"></span>
+        <button id="upload-cancel" class="ghost">Cancel</button>
+      </div>
+      <div class="bar"><div id="upload-bar"></div></div>
+      <ul id="upload-errors" class="errors"></ul>
+    </div>
+
+    <div class="row toolbar">
+      <span id="photo-count" class="muted"></span>
+      <span class="spacer"></span>
+      <select id="filter">
+        <option value="all">All</option>
+        <option value="pending">Not on frame yet</option>
+        <option value="error">Errors</option>
+      </select>
+      <button id="select-toggle" class="ghost">Select</button>
+      <button id="select-all" class="ghost hidden">Select all</button>
+      <button id="delete-selected" class="danger hidden" disabled>Delete</button>
+    </div>
+    <div id="grid" class="grid"></div>
+    <p id="empty" class="muted center hidden">No photos yet. Drop some above.</p>
+  </section>
+
+  <!-- FRAME -->
+  <section id="tab-frame" class="panel">
+    <div class="cols">
+      <div class="card">
+        <h2>On screen now</h2>
+        <img id="screen" class="screen" alt="Current frame screen">
+        <div class="row controls">
+          <button data-ctl="prev">◀ Prev</button>
+          <button data-ctl="pause" id="pause-btn">Pause</button>
+          <button data-ctl="next">Next ▶</button>
+          <span class="spacer"></span>
+          <button id="sync-now" class="ghost">Sync now</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Slideshow settings</h2>
+        <form id="settings">
+          <label>Seconds per photo <input type="number" name="intervalSeconds" min="3" max="86400"></label>
+          <label class="check"><input type="checkbox" name="shuffle"> Shuffle</label>
+          <label class="check"><input type="checkbox" name="showNewFirst"> Show newly added photos first</label>
+          <label>Transition
+            <select name="transition"><option value="fade">Fade</option><option value="none">None</option></select>
+          </label>
+          <label>Transition length (ms) <input type="number" name="transitionMs" min="0" max="5000" step="100"></label>
+          <div class="row"><button type="submit">Save</button><span id="settings-msg" class="muted"></span></div>
+        </form>
+        <h2>Status</h2>
+        <table id="info" class="kv"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOGS -->
+  <section id="tab-logs" class="panel">
+    <div class="row toolbar">
+      <select id="log-source">
+        <option value="server">Server</option>
+        <option value="frame">Frame</option>
+        <option value="journal">Frame journal (survives restarts)</option>
+      </select>
+      <select id="log-level">
+        <option value="debug">Debug+</option>
+        <option value="info" selected>Info+</option>
+        <option value="warn">Warn+</option>
+        <option value="error">Error</option>
+      </select>
+      <input id="log-search" type="search" placeholder="Filter text">
+      <label class="check"><input id="log-follow" type="checkbox" checked> Live</label>
+      <span class="spacer"></span>
+      <button id="log-clear" class="ghost">Clear view</button>
+    </div>
+    <div id="log-error" class="errors"></div>
+    <div id="logs" class="logs"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

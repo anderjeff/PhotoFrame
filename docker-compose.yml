@@ -1,0 +1,26 @@
+# Example deployment for the NAS. Copy to the NAS, edit the values marked
+# CHANGE ME, then: docker compose up -d
+services:
+  photoframe:
+    image: YOUR_DOCKERHUB_USER/photoframe-server:latest # CHANGE ME
+    container_name: photoframe
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./photoframe-data:/data # originals, renditions, thumbnails, index.json
+    environment:
+      FRAME_URL: http://192.168.1.50:8080 # CHANGE ME: the Pi's address
+      FRAME_TOKEN: change-me # CHANGE ME: must match FRAME_TOKEN in /etc/photoframe/frame.env on the Pi
+      TZ: America/Chicago
+      # Optional:
+      # LOG_LEVEL: debug        # debug | info | warn | error
+      # WORKERS: "2"            # parallel image-processing jobs (default: CPU count, max 4)
+      # JPEG_QUALITY: "90"
+      # BACKGROUND: blur        # blur | black: fill around photos that don't match the screen's shape
+      # FRAME_WIDTH: "1920"     # override the frame's reported resolution
+      # FRAME_HEIGHT: "1080"
+      # SYNC_INTERVAL: 15s
+      # MAX_UPLOAD_MB: "200"
+    # If the NAS requires a specific owner for the data folder, run as that user:
+    # user: "1026:100"
