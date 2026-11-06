@@ -2,7 +2,7 @@
 # Installs or updates the PhotoFrame display service on a Raspberry Pi.
 # Re-run it any time to update to the latest release; config and photos are kept.
 #
-#   curl -fsSL https://github.com/YOUR_GITHUB_USER/PhotoFrame/releases/latest/download/install-frame.sh | sudo bash
+#   curl -fsSL https://github.com/anderjeff/PhotoFrame/releases/latest/download/install-frame.sh | sudo bash
 #
 # Options (after `sudo bash -s --` when piping):
 #   --version vX.Y.Z   install a specific release instead of the latest
@@ -11,7 +11,7 @@
 #   --keep-desktop     don't switch the Pi to console boot (the desktop draws over the photos)
 set -euo pipefail
 
-REPO="${PHOTOFRAME_REPO:-YOUR_GITHUB_USER/PhotoFrame}" # CHANGE ME (or set PHOTOFRAME_REPO)
+REPO="${PHOTOFRAME_REPO:-anderjeff/PhotoFrame}"
 VERSION="latest"
 TOKEN=""
 BINARY=""

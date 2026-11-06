@@ -38,7 +38,7 @@ jobs:
           mkdir dist
           GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags "$LDFLAGS" -o dist/photoframe-linux-armv7 ./cmd/frame
           GOOS=linux GOARCH=arm64       go build -trimpath -ldflags "$LDFLAGS" -o dist/photoframe-linux-arm64 ./cmd/frame
-          sed 's#YOUR_GITHUB_USER/PhotoFrame#${{ github.repository }}#' scripts/install-frame.sh > dist/install-frame.sh
+          sed "s#anderjeff/PhotoFrame#${{ github.repository }}#" scripts/install-frame.sh > dist/install-frame.sh
           cd dist && sha256sum photoframe-linux-* > checksums.txt
       - uses: softprops/action-gh-release@v2
         with:

@@ -15,7 +15,7 @@ A fast, self-hosted digital photo frame made of two Go programs:
 1. Flash **Raspberry Pi OS Lite** (32- or 64-bit) and enable SSH. The desktop isn't needed; if you install it, the installer switches the Pi to console boot.
 2. On the Pi, run:
    ```sh
-   curl -fsSL https://github.com/YOUR_GITHUB_USER/PhotoFrame/releases/latest/download/install-frame.sh | sudo bash
+   curl -fsSL https://github.com/anderjeff/PhotoFrame/releases/latest/download/install-frame.sh | sudo bash
    ```
 3. Note the **FRAME_URL** and **token** that it prints. Reboot once if it asks you to.
 

@@ -46,5 +46,5 @@ One Go module (`photoframe`) with two programs. They talk only over HTTP. Shared
 
 - Pushing a `v*` tag runs `.github/workflows/release.yml`: it builds the Pi binaries and attaches them, `checksums.txt` and `install-frame.sh` to a GitHub Release, then pushes the multi-arch server image to Docker Hub (needs secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`).
 - The Pi updates by re-running `install-frame.sh`, which is idempotent and keeps `/etc/photoframe/frame.env`. `scripts/deploy-frame.ps1` builds locally and installs over SSH for development.
-- `install-frame.sh` contains a `YOUR_GITHUB_USER/PhotoFrame` placeholder, which the release workflow replaces with the real repo in the copy attached to the release. `docker-compose.yml` has a `YOUR_DOCKERHUB_USER` placeholder.
+- `install-frame.sh` defaults to the `anderjeff/PhotoFrame` repo; the release workflow rewrites that to `github.repository` in the attached copy, so forks work. `docker-compose.yml` has a `YOUR_DOCKERHUB_USER` placeholder.
 - Shell scripts must keep LF line endings (enforced by `.gitattributes`).
