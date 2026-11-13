@@ -56,6 +56,7 @@
   <!-- FRAME -->
   <section id="tab-frame" class="panel">
     <div class="cols">
+      <div>
       <div class="card">
         <h2>On screen now</h2>
         <img id="screen" class="screen" alt="Current frame screen">
@@ -66,6 +67,35 @@
           <span class="spacer"></span>
           <button id="sync-now" class="ghost">Sync now</button>
         </div>
+      </div>
+      <div class="card">
+        <h2>Photo background</h2>
+        <p class="muted small">Fills the screen around photos whose shape doesn't match it, such as portrait photos on a landscape screen.</p>
+        <form id="background">
+          <div class="row seg">
+            <label class="check"><input type="radio" name="mode" value="blur"> Blurred photo</label>
+            <label class="check"><input type="radio" name="mode" value="color"> Solid color</label>
+          </div>
+          <label data-for="blur">Brightness <span class="row"><input type="range" name="brightness" min="0" max="100"><output name="brightnessOut"></output></span></label>
+          <label data-for="blur">Blur <span class="row"><input type="range" name="blur" min="1" max="10"><output name="blurOut"></output></span></label>
+          <label data-for="color">Color
+            <span class="row">
+              <span class="swatches">
+                <button type="button" data-color="#000000" title="Black"></button>
+                <button type="button" data-color="#1c1c1e" title="Charcoal"></button>
+                <button type="button" data-color="#3a3a3c" title="Dark gray"></button>
+                <button type="button" data-color="#f2f0eb" title="Off-white"></button>
+                <button type="button" data-color="#ffffff" title="White"></button>
+              </span>
+              <input type="color" name="color">
+            </span>
+          </label>
+          <img id="bg-preview" class="screen" alt="Preview of a photo with this background">
+          <p id="bg-preview-msg" class="muted small hidden"></p>
+          <div class="row"><button type="submit">Save</button><button type="button" id="bg-reset" class="ghost">Reset to default</button><span id="bg-msg" class="muted"></span></div>
+          <p class="muted small">Saving re-renders every photo; the frame picks up the new versions as each one finishes.</p>
+        </form>
+      </div>
       </div>
       <div class="card">
         <h2>Slideshow settings</h2>

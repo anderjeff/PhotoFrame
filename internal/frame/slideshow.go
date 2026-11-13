@@ -35,6 +35,7 @@ const (
 	evResume
 	evAdded
 	evRemoved
+	evReplaced
 	evSettings
 )
 
@@ -104,6 +105,11 @@ func (s *Slideshow) StoreChanged(added, removed []string) {
 	if len(added) > 0 {
 		s.events <- event{kind: evAdded, keys: added}
 	}
+}
+
+// StoreReplaced is wired to Store.SetOnReplace.
+func (s *Slideshow) StoreReplaced(key string) {
+	s.events <- event{kind: evReplaced, keys: []string{key}}
 }
 
 // Control handles "next", "prev", "pause", "resume".
@@ -225,6 +231,27 @@ func (s *Slideshow) handle(ev event, reset func(), resetIn func(time.Duration)) 
 		case s.Settings().ShowNewFirst && !paused && time.Since(s.shownAtTime()) > 5*time.Second:
 			// Show the first new arrival promptly; the rest follow at the normal interval.
 			resetIn(time.Second)
+		}
+		s.ensurePrefetch()
+	case evReplaced:
+		// The photo stays in rotation; only decoded copies of the old file are stale.
+		k := ev.keys[0]
+		delete(s.bad, k)
+		if p := s.pre; p != nil && p.key == k {
+			<-p.done // keep the one-decode-at-a-time rule; it's at most one photo's work
+			s.pre = nil
+		}
+		if cur, _ := s.Status(); cur == k {
+			// Redraw it now so a change (e.g. a new background) shows up right away.
+			if fr, err := s.load(k); err != nil {
+				s.log.Warn("reloading replaced photo failed", "key", k, "err", err)
+			} else {
+				s.transition(fr)
+				s.mu.Lock()
+				s.curFrame = fr
+				s.mu.Unlock()
+				s.log.Debug("reloaded replaced photo", "key", k)
+			}
 		}
 		s.ensurePrefetch()
 	case evRemoved:

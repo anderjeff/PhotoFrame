@@ -35,9 +35,10 @@ type Store struct {
 	dir string
 	log *slog.Logger
 
-	mu       sync.RWMutex
-	photos   map[string]Photo
-	onChange func(added, removed []string)
+	mu        sync.RWMutex
+	photos    map[string]Photo
+	onChange  func(added, removed []string)
+	onReplace func(key string)
 }
 
 func OpenStore(dir string, log *slog.Logger) (*Store, error) {
@@ -61,6 +62,14 @@ func OpenStore(dir string, log *slog.Logger) (*Store, error) {
 func (s *Store) SetOnChange(fn func(added, removed []string)) {
 	s.mu.Lock()
 	s.onChange = fn
+	s.mu.Unlock()
+}
+
+// SetOnReplace registers the callback invoked (outside locks) when the server
+// replaces a photo with a new rendition, e.g. after a background change.
+func (s *Store) SetOnReplace(fn func(key string)) {
+	s.mu.Lock()
+	s.onReplace = fn
 	s.mu.Unlock()
 }
 
@@ -186,6 +195,13 @@ func (s *Store) Put(id, rev string, r io.Reader, maxBytes int64) error {
 	}
 	if !existed {
 		s.notify([]string{id}, nil)
+	} else if old.Path != final {
+		s.mu.RLock()
+		fn := s.onReplace
+		s.mu.RUnlock()
+		if fn != nil {
+			fn(id)
+		}
 	}
 	return nil
 }

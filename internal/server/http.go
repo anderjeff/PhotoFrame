@@ -58,6 +58,10 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/photos/{id}/retry", a.retry)
 	m.HandleFunc("GET /api/photos/{id}/{kind}", a.photoFile)
 
+	m.HandleFunc("GET /api/background", a.getBackground)
+	m.HandleFunc("PUT /api/background", a.putBackground)
+	m.HandleFunc("GET /api/background/preview", a.previewBackground)
+
 	// Frame passthroughs, so the browser only ever talks to the server.
 	m.HandleFunc("GET /api/frame/info", a.proxy("/api/info"))
 	m.HandleFunc("GET /api/frame/logs", a.proxy("/api/logs"))

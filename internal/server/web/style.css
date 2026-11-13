@@ -64,3 +64,14 @@ form label.check { justify-content: flex-start; }
 .logs .l { padding: 1px 0; }
 .logs .t { color: var(--muted); } .logs .DEBUG { color: var(--muted); } .logs .WARN { color: var(--warn); } .logs .ERROR { color: var(--err); }
 .logs .a { color: var(--muted); }
+
+.small { font-size: 12px; margin: 0 0 10px; }
+input[type=range] { width: 160px; }
+output { min-width: 3em; text-align: right; color: var(--muted); }
+.seg { margin-bottom: 10px; gap: 16px; }
+.seg label { margin: 0; }
+.swatches { display: flex; gap: 6px; }
+.swatches button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid var(--border); }
+.swatches button.on { border-color: var(--accent); }
+input[type=color] { width: 40px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+#bg-preview { margin: 4px 0 10px; }

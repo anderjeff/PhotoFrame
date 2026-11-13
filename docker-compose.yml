@@ -17,7 +17,8 @@ services:
       # LOG_LEVEL: debug        # debug | info | warn | error
       # WORKERS: "2"            # parallel image-processing jobs (default: CPU count, max 4)
       # JPEG_QUALITY: "90"
-      # BACKGROUND: blur        # blur | black: fill around photos that don't match the screen's shape
+      # BACKGROUND: blur        # blur | black: initial fill around photos that don't match the screen's shape;
+      #                         # change it any time in the web UI (Frame → Photo background)
       # FRAME_WIDTH: "1920"     # override the frame's reported resolution
       # FRAME_HEIGHT: "1080"
       # SYNC_INTERVAL: 15s

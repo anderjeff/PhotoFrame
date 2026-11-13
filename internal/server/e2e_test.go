@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ func TestEndToEnd(t *testing.T) {
 	disp := frame.NewHeadless(320, 180)
 	show := frame.NewSlideshow(log, fstore, disp, frame.SettingsPath(frameDir), func() []string { return []string{"empty"} })
 	fstore.SetOnChange(show.StoreChanged)
+	fstore.SetOnReplace(show.StoreReplaced)
 	go show.Run(ctx.Done())
 	fapi := &frame.API{Log: log, Ring: ring, Store: fstore, Show: show, Display: disp, DataDir: frameDir, Token: token, Started: time.Now()}
 	fsrv := httptest.NewServer(fapi.Handler())
@@ -107,13 +109,52 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("screenshot centre pixel wrong")
 	}
 
+	// Background preview renders a small screen-shaped sample.
+	resp, err := http.Get(ssrv.URL + "/api/background/preview?mode=color&color=%23ff0000")
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("background preview: %v %v", resp, err)
+	}
+	prev, err := jpeg.Decode(resp.Body)
+	resp.Body.Close()
+	if err != nil || prev.Bounds().Dx() != 640 || prev.Bounds().Dy() != 360 {
+		t.Fatalf("preview size wrong: %v %v", prev.Bounds(), err)
+	}
+	if r, g, b, _ := prev.At(5, 180).RGBA(); r>>8 < 200 || g>>8 > 60 || b>>8 > 60 {
+		t.Fatalf("preview edge should be red, got %d,%d,%d", r>>8, g>>8, b>>8)
+	}
+
+	// Saving a background re-renders and re-pushes the photo with a new rev.
+	req, _ := http.NewRequest("PUT", ssrv.URL+"/api/background", strings.NewReader(`{"mode":"color","color":"#FF0000","brightness":55,"blur":5}`))
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 200 {
+		t.Fatalf("put background: %v %v", resp, err)
+	}
+	waitFor(t, "re-rendered photo on frame", func() bool {
+		m := fstore.Manifest()
+		return len(m) == 1 && m[0].Rev == "320x180v1cff0000"
+	})
+	fp, _ = fstore.Get(id)
+	f, _ = os.Open(fp.Path)
+	onFrame, err := jpeg.Decode(f)
+	f.Close()
+	if r, g, b, _ := onFrame.At(5, 90).RGBA(); err != nil || r>>8 < 200 || g>>8 > 60 || b>>8 > 60 {
+		t.Fatalf("frame copy edge should be red, got %d,%d,%d (%v)", r>>8, g>>8, b>>8, err)
+	}
+	// The photo on screen is redrawn with the new background right away.
+	waitFor(t, "screen shows new background", func() bool {
+		img := show.Screenshot()
+		return img != nil && colorDist(img.RGBAAt(5, 90), color.RGBA{255, 0, 0, 255}) < 60
+	})
+	if store.Background().Color != "#ff0000" {
+		t.Fatalf("background not saved: %+v", store.Background())
+	}
+
 	// Re-uploading identical bytes is a no-op.
 	if res := upload(t, ssrv.URL, "copy.jpg", data); !res.Duplicate || res.ID != id {
 		t.Fatalf("expected duplicate: %+v", res)
 	}
 
 	// Deleting on the server removes it from the frame.
-	req, _ := http.NewRequest("DELETE", ssrv.URL+"/api/photos/"+id, nil)
+	req, _ = http.NewRequest("DELETE", ssrv.URL+"/api/photos/"+id, nil)
 	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete: %v %v", resp, err)
 	}
@@ -121,7 +162,7 @@ func TestEndToEnd(t *testing.T) {
 	waitFor(t, "slideshow empty", func() bool { cur, _ := show.Status(); return cur == "" })
 
 	// Proxied frame logs are reachable through the server.
-	resp, err := http.Get(ssrv.URL + "/api/frame/logs?level=debug")
+	resp, err = http.Get(ssrv.URL + "/api/frame/logs?level=debug")
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatalf("frame logs proxy: %v %v", resp, err)
 	}

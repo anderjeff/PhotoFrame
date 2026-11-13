@@ -299,6 +299,7 @@ function refreshScreen() {
 async function enterFrameTab() {
   renderInfo();
   refreshScreen();
+  if (!bg.saved) loadBackground();
   clearInterval(screenTimer);
   screenTimer = setInterval(() => { if (state.tab === 'frame') refreshScreen(); else clearInterval(screenTimer); }, 4000);
   try {
@@ -324,6 +325,75 @@ $('#settings').addEventListener('submit', async (e) => {
     await api('/api/frame/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     $('#settings-msg').textContent = 'Saved';
   } catch (err) { $('#settings-msg').textContent = 'Failed: ' + err.message; }
+});
+
+/* ---------- photo background ---------- */
+const bg = { saved: null, timer: null, url: null, seq: 0 };
+const bgForm = $('#background');
+const DEFAULT_BG = { mode: 'blur', color: '#000000', brightness: 55, blur: 5 };
+
+function bgValues() {
+  const f = bgForm.elements;
+  return { mode: f.mode.value || 'blur', color: f.color.value, brightness: +f.brightness.value, blur: +f.blur.value };
+}
+function bgFill(b) {
+  const f = bgForm.elements;
+  f.mode.value = b.mode; f.color.value = b.color; f.brightness.value = b.brightness; f.blur.value = b.blur;
+  bgChanged();
+}
+function bgChanged() {
+  const b = bgValues(), f = bgForm.elements;
+  f.brightnessOut.value = b.brightness + '%';
+  f.blurOut.value = b.blur;
+  bgForm.querySelectorAll('[data-for]').forEach((el) => el.classList.toggle('hidden', el.dataset.for !== b.mode));
+  bgForm.querySelectorAll('[data-color]').forEach((el) => el.classList.toggle('on', el.dataset.color === b.color));
+  const dirty = bg.saved && JSON.stringify(b) !== JSON.stringify(bg.saved);
+  $('#bg-msg').textContent = dirty ? 'Not saved' : '';
+  clearTimeout(bg.timer);
+  bg.timer = setTimeout(bgPreview, 120); // sliders fire constantly; render once they settle
+}
+async function bgPreview() {
+  const seq = ++bg.seq;
+  const qs = new URLSearchParams(Object.entries(bgValues()).map(([k, v]) => [k, String(v)]));
+  try {
+    const res = await fetch('/api/background/preview?' + qs);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+    const blob = await res.blob();
+    if (seq !== bg.seq) return; // a newer preview was requested meanwhile
+    if (bg.url) URL.revokeObjectURL(bg.url);
+    bg.url = URL.createObjectURL(blob);
+    $('#bg-preview').src = bg.url;
+    $('#bg-preview').classList.remove('hidden');
+    $('#bg-preview-msg').classList.add('hidden');
+  } catch (e) {
+    if (seq !== bg.seq) return;
+    $('#bg-preview').classList.add('hidden');
+    const msg = $('#bg-preview-msg');
+    msg.textContent = e.message === 'no photos yet' ? 'Upload a photo to see a preview.' : 'Preview unavailable: ' + e.message;
+    msg.classList.remove('hidden');
+  }
+}
+async function loadBackground() {
+  try {
+    bg.saved = await api('/api/background');
+    bgFill(bg.saved);
+  } catch (e) { $('#bg-msg').textContent = 'Failed to load: ' + e.message; }
+}
+bgForm.addEventListener('input', bgChanged);
+bgForm.querySelectorAll('[data-color]').forEach((b) => {
+  b.style.background = b.dataset.color;
+  b.addEventListener('click', () => { bgForm.elements.color.value = b.dataset.color; bgChanged(); });
+});
+$('#bg-reset').addEventListener('click', () => bgFill(DEFAULT_BG));
+bgForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const res = await api('/api/background', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bgValues()) });
+    bg.saved = res.background;
+    bgFill(bg.saved);
+    const n = res.rerendering;
+    $('#bg-msg').textContent = n ? `Saved. Re-rendering ${n} photo${n === 1 ? '' : 's'}…` : 'Saved';
+  } catch (err) { $('#bg-msg').textContent = 'Failed: ' + err.message; }
 });
 
 $$('[data-ctl]').forEach((b) => b.addEventListener('click', async () => {

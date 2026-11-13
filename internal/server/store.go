@@ -36,9 +36,10 @@ type Photo struct {
 }
 
 type indexFile struct {
-	DisplayW int      `json:"displayW"`
-	DisplayH int      `json:"displayH"`
-	Photos   []*Photo `json:"photos"`
+	DisplayW   int         `json:"displayW"`
+	DisplayH   int         `json:"displayH"`
+	Background *Background `json:"background,omitempty"` // nil until set in the UI
+	Photos     []*Photo    `json:"photos"`
 }
 
 // Store keeps the photo index in memory and persists it to index.json
@@ -52,6 +53,8 @@ type Store struct {
 	photos   map[string]*Photo
 	displayW int
 	displayH int
+	bg       *Background // saved from the UI; nil means defBg
+	defBg    Background
 	dirty    chan struct{}
 }
 
@@ -67,7 +70,7 @@ func OpenStore(dir string, log *slog.Logger, events *Broker) (*Store, error) {
 		}
 	}
 	s := &Store{dir: dir, log: log, events: events, photos: map[string]*Photo{},
-		displayW: 1920, displayH: 1080, dirty: make(chan struct{}, 1)}
+		displayW: 1920, displayH: 1080, defBg: DefaultBackground(""), dirty: make(chan struct{}, 1)}
 	b, err := os.ReadFile(s.indexPath())
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -83,6 +86,9 @@ func OpenStore(dir string, log *slog.Logger, events *Broker) (*Store, error) {
 		}
 		if idx.DisplayW > 0 && idx.DisplayH > 0 {
 			s.displayW, s.displayH = idx.DisplayW, idx.DisplayH
+		}
+		if idx.Background != nil && idx.Background.Normalize() == nil {
+			s.bg = idx.Background
 		}
 	}
 	return s, nil
@@ -120,7 +126,7 @@ func (s *Store) RunSaver(ctx context.Context) {
 
 func (s *Store) save() {
 	s.mu.RLock()
-	idx := indexFile{DisplayW: s.displayW, DisplayH: s.displayH, Photos: make([]*Photo, 0, len(s.photos))}
+	idx := indexFile{DisplayW: s.displayW, DisplayH: s.displayH, Background: s.bg, Photos: make([]*Photo, 0, len(s.photos))}
 	for _, p := range s.photos {
 		cp := *p
 		idx.Photos = append(idx.Photos, &cp)
@@ -231,4 +237,35 @@ func (s *Store) SetDisplaySize(w, h int) bool {
 		s.markDirty()
 	}
 	return changed
+}
+
+// Background returns the saved background, or the default if none was saved.
+func (s *Store) Background() Background {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.bg != nil {
+		return *s.bg
+	}
+	return s.defBg
+}
+
+// SetDefaultBackground sets the background used until one is saved.
+func (s *Store) SetDefaultBackground(b Background) {
+	s.mu.Lock()
+	s.defBg = b
+	s.mu.Unlock()
+}
+
+// SetBackground saves b (already normalized) and reports whether the
+// rendered output changes as a result.
+func (s *Store) SetBackground(b Background) bool {
+	s.mu.Lock()
+	old := s.defBg
+	if s.bg != nil {
+		old = *s.bg
+	}
+	s.bg = &b
+	s.mu.Unlock()
+	s.markDirty()
+	return old.tag() != b.tag()
 }

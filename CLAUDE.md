@@ -27,7 +27,7 @@ One Go module (`photoframe`) with two programs. They talk only over HTTP. Shared
 
 **Server (`cmd/server`, `internal/server`)**: runs on a NAS in Docker. Configured only by environment variables (`config.go`).
 - `http.go`: upload endpoint. It streams multipart parts to `DATA_DIR/tmp` while hashing. The **photo ID is the first 16 bytes of the original's SHA-256**, so duplicate uploads are no-ops. Also serves the embedded web UI (`web/`, vanilla JS, no build step) and proxies `/api/frame/*` to the frame, so the browser never talks to the Pi directly.
-- `processor.go` + `imaging.go`: worker pool that renders each original into an image of **exactly the frame's resolution** (EXIF orientation, CatmullRom scaling, blurred fill). It scales before rotating to avoid full-resolution rotation work. Output goes to `display/<id>.jpg` and `thumbs/<id>.jpg`.
+- `processor.go` + `imaging.go`: worker pool that renders each original into an image of **exactly the frame's resolution** (EXIF orientation, CatmullRom scaling, background fill from `background.go`). It scales before rotating to avoid full-resolution rotation work. Output goes to `display/<id>.jpg` and `thumbs/<id>.jpg`.
 - `sync.go`: `Syncer` reconciles the server's photo set with the frame's manifest. It runs on a timer and immediately (debounced) when triggered by processing or deletes. It pushes newest uploads first and deletes photos the server no longer has.
 - `store.go`: in-memory index persisted to `DATA_DIR/index.json` (debounced). `events.go` broadcasts changes to the UI over SSE.
 
@@ -38,7 +38,7 @@ One Go module (`photoframe`) with two programs. They talk only over HTTP. Shared
 - `store.go`: files in `DATA_DIR/photos`. Server-managed files are named `<id>_<rev>.jpg`. Other `.jpg`/`.png` files placed by hand are shown but never synced or deleted. Writes are atomic (temp file → fsync → rename).
 - `httpapi.go`: token-protected API (`X-PhotoFrame-Token`) used by the server: manifest, PUT/DELETE photos, settings, control, logs, journal, screenshot.
 
-**Renditions and `rev`**: a rendition's rev is `<W>x<H>v<procVersion>` (e.g. `1920x1080v1`). When the frame reports a new resolution, or `procVersion` in `processor.go` is bumped, every photo is re-rendered and re-pushed automatically. **Bump `procVersion` whenever rendering output changes.**
+**Renditions and `rev`**: a rendition's rev is `<W>x<H>v<procVersion><bgTag>` (e.g. `1920x1080v1`, or `1920x1080v1c000000` for a black background; the default blur has no tag). When the frame reports a new resolution, the background is changed in the UI (saved in `index.json`), or `procVersion` in `processor.go` is bumped, every photo is re-rendered and re-pushed automatically. A background-only change keeps thumbnails, and the frame redraws the on-screen photo when its file is replaced. **Bump `procVersion` whenever rendering output changes.**
 
 **Logging**: `internal/logx` sends slog output both to stdout (journald / docker logs) and to an in-memory ring served at `/api/logs?since=N&level=`. The UI polls that endpoint incrementally. Log the timings that matter for performance work (decode and total durations are already logged).
 

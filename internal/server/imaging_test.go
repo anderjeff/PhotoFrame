@@ -120,7 +120,7 @@ func TestFitSize(t *testing.T) {
 func TestRenderOutputsExactScreenSize(t *testing.T) {
 	src := image.NewRGBA(image.Rect(0, 0, 300, 400)) // portrait
 	for _, o := range []int{1, 6} {
-		canvas, fitted := render(src, o, 320, 180, "blur")
+		canvas, fitted := render(src, o, 320, 180, DefaultBackground(""))
 		if canvas.Rect.Dx() != 320 || canvas.Rect.Dy() != 180 {
 			t.Errorf("orientation %d: canvas %v", o, canvas.Rect)
 		}

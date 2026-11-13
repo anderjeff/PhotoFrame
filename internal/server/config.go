@@ -21,7 +21,7 @@ type Config struct {
 	Height       int           // FRAME_HEIGHT
 	Workers      int           // WORKERS: concurrent image-processing jobs
 	JPEGQuality  int           // JPEG_QUALITY for display renditions
-	Background   string        // BACKGROUND: "blur" or "black" fill around non-matching aspect ratios
+	Background   string        // BACKGROUND: "blur" or "black"; only the default until a background is saved in the web UI
 	SyncInterval time.Duration // SYNC_INTERVAL: periodic reconcile with the frame
 	MaxUploadMB  int64         // MAX_UPLOAD_MB per file
 	LogLevel     slog.Level    // LOG_LEVEL

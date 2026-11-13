@@ -136,7 +136,7 @@ func orient(src *image.RGBA, o int) *image.RGBA {
 // render produces the exact W×H image the frame displays, plus the fitted
 // (un-padded) photo used for the thumbnail. The source is scaled before it is
 // rotated, so the expensive full-resolution work happens only once.
-func render(img image.Image, orientation, W, H int, background string) (canvas, fitted *image.RGBA) {
+func render(img image.Image, orientation, W, H int, bg Background) (canvas, fitted *image.RGBA) {
 	sb := img.Bounds()
 	ow, oh := sb.Dx(), sb.Dy()
 	if orientation >= 5 {
@@ -155,30 +155,33 @@ func render(img image.Image, orientation, W, H int, background string) (canvas, 
 		return fitted, fitted
 	}
 	canvas = image.NewRGBA(image.Rect(0, 0, W, H))
-	if background == "black" {
-		draw.Draw(canvas, canvas.Bounds(), image.Black, image.Point{}, draw.Src)
+	if bg.Mode == "color" {
+		draw.Draw(canvas, canvas.Bounds(), image.NewUniform(bg.rgba()), image.Point{}, draw.Src)
 	} else {
-		blurBackground(canvas, fitted)
+		blurBackground(canvas, fitted, bg.Brightness, bg.Blur)
 	}
 	x0, y0 := (W-fw)/2, (H-fh)/2
 	draw.Draw(canvas, image.Rect(x0, y0, x0+fw, y0+fh), fitted, image.Point{}, draw.Src)
 	return canvas, fitted
 }
 
-// blurBackground fills canvas with a darkened, heavily blurred, cover-cropped
-// copy of src, so portrait photos on a landscape screen don't get black bars.
-func blurBackground(canvas, src *image.RGBA) {
+// blurBackground fills canvas with a darkened, blurred, cover-cropped copy of
+// src, so portrait photos on a landscape screen don't get black bars.
+// brightness is 0–100 %; strength 1–10 sets how small the copy is shrunk
+// before being blown back up (5 = 1/24 of the screen size).
+func blurBackground(canvas, src *image.RGBA, brightness, strength int) {
 	W, H := canvas.Rect.Dx(), canvas.Rect.Dy()
-	sw, sh := max(W/24, 1), max(H/24, 1)
+	div := 4*strength + 4
+	sw, sh := max(W/div, 1), max(H/div, 1)
 	small := image.NewRGBA(image.Rect(0, 0, sw, sh))
 	xdraw.BiLinear.Scale(small, small.Bounds(), src, coverRect(src.Rect, sw, sh), xdraw.Src, nil)
 	for range 3 {
 		boxBlur(small, 2)
 	}
 	for i := 0; i < len(small.Pix); i += 4 {
-		small.Pix[i] = byte(int(small.Pix[i]) * 55 / 100)
-		small.Pix[i+1] = byte(int(small.Pix[i+1]) * 55 / 100)
-		small.Pix[i+2] = byte(int(small.Pix[i+2]) * 55 / 100)
+		small.Pix[i] = byte(int(small.Pix[i]) * brightness / 100)
+		small.Pix[i+1] = byte(int(small.Pix[i+1]) * brightness / 100)
+		small.Pix[i+2] = byte(int(small.Pix[i+2]) * brightness / 100)
 	}
 	xdraw.BiLinear.Scale(canvas, canvas.Bounds(), small, small.Bounds(), xdraw.Src, nil)
 }

@@ -49,6 +49,7 @@ func main() {
 	if cfg.Width > 0 && cfg.Height > 0 {
 		store.SetDisplaySize(cfg.Width, cfg.Height)
 	}
+	store.SetDefaultBackground(server.DefaultBackground(cfg.Background))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

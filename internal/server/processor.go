@@ -10,6 +10,7 @@ import (
 	_ "image/png"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,24 +24,39 @@ const procVersion = 1
 
 // Processor turns originals into frame-ready renditions on a worker pool.
 type Processor struct {
-	store      *Store
-	log        *slog.Logger
-	quality    int
-	background string
-	workers    int
-	onReady    func(id string)
-	q          *workQueue
+	store   *Store
+	log     *slog.Logger
+	quality int
+	workers int
+	onReady func(id string)
+	q       *workQueue
 }
 
 func NewProcessor(store *Store, log *slog.Logger, cfg Config, onReady func(string)) *Processor {
-	return &Processor{store: store, log: log, quality: cfg.JPEGQuality, background: cfg.Background,
+	return &Processor{store: store, log: log, quality: cfg.JPEGQuality,
 		workers: cfg.Workers, onReady: onReady, q: newWorkQueue()}
 }
 
-// Rev is the rendition tag for the current display size, e.g. "1920x1080v1".
+// Rev is the rendition tag for the current display size and background,
+// e.g. "1920x1080v1", or "1920x1080v1c000000" with a black background.
 func (p *Processor) Rev() string {
 	w, h := p.store.DisplaySize()
-	return fmt.Sprintf("%dx%dv%d", w, h, procVersion)
+	return revFor(w, h, p.store.Background())
+}
+
+func revFor(w, h int, bg Background) string {
+	return fmt.Sprintf("%dx%dv%d%s", w, h, procVersion, bg.tag())
+}
+
+// revBase strips the background tag: "1920x1080v1c000000" → "1920x1080v1".
+// Tags start with a letter; the part before has only digits after the "v".
+func revBase(rev string) string {
+	if i := strings.LastIndexByte(rev, 'v'); i >= 0 {
+		if j := strings.IndexFunc(rev[i+1:], func(r rune) bool { return r < '0' || r > '9' }); j >= 0 {
+			return rev[:i+1+j]
+		}
+	}
+	return rev
 }
 
 func (p *Processor) Enqueue(id string) { p.q.push(id) }
@@ -80,7 +96,8 @@ func (p *Processor) process(id string) {
 	}()
 
 	w, h := p.store.DisplaySize()
-	rev := fmt.Sprintf("%dx%dv%d", w, h, procVersion)
+	bg := p.store.Background()
+	rev := revFor(w, h, bg)
 	data, err := os.ReadFile(p.store.OriginalPath(ph))
 	if err != nil {
 		fail(err)
@@ -99,15 +116,20 @@ func (p *Processor) process(id string) {
 		srcW, srcH = srcH, srcW
 	}
 
-	canvas, fitted := render(img, orientation, w, h, p.background)
+	canvas, fitted := render(img, orientation, w, h, bg)
 	img = nil
 	if err := writeJPEG(p.store.DisplayPath(id), canvas, p.quality); err != nil {
 		fail(err)
 		return
 	}
-	if err := writeJPEG(p.store.ThumbPath(id), thumbnail(fitted, 480), 82); err != nil {
-		fail(err)
-		return
+	// The thumbnail has no background, so a background-only change keeps it.
+	thumbPath := p.store.ThumbPath(id)
+	_, statErr := os.Stat(thumbPath)
+	if statErr != nil || revBase(ph.Rev) != revBase(rev) {
+		if err := writeJPEG(thumbPath, thumbnail(fitted, 480), 82); err != nil {
+			fail(err)
+			return
+		}
 	}
 	p.store.Update(id, func(x *Photo) {
 		x.Status, x.Error, x.Rev, x.Width, x.Height = StatusReady, "", rev, srcW, srcH

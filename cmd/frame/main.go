@@ -97,6 +97,7 @@ func main() {
 	}
 	show := frame.NewSlideshow(log, store, disp, frame.SettingsPath(*dataDir), emptyLines)
 	store.SetOnChange(show.StoreChanged)
+	store.SetOnReplace(show.StoreReplaced)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
