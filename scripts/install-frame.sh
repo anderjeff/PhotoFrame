@@ -66,7 +66,8 @@ log "Installed $("$BIN" -version)"
 # --- config -----------------------------------------------------------------
 mkdir -p "$CONF_DIR" "$DATA/photos"
 if [[ ! -f "$CONF" ]]; then
-  [[ -n "$TOKEN" ]] || TOKEN=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+  # Fixed-size read: `tr </dev/urandom | head` gets SIGPIPE and aborts under pipefail.
+  [[ -n "$TOKEN" ]] || TOKEN=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
   cat >"$CONF" <<EOF
 # PhotoFrame frame settings. Restart after editing: sudo systemctl restart photoframe
 LISTEN=:8080
