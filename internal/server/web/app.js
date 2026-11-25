@@ -177,13 +177,14 @@ $('#delete-selected').addEventListener('click', async () => {
 
 /* ---------- uploads ---------- */
 const UPLOAD_CONCURRENCY = 4;
-const up = { queue: [], active: new Set(), total: 0, done: 0, dups: 0, failed: 0, bytesTotal: 0, bytesDone: 0, inflight: new Map() };
+const up = { queue: [], active: new Set(), total: 0, done: 0, dups: 0, failed: 0, fromZip: 0, unpacking: 0, bytesTotal: 0, bytesDone: 0, inflight: new Map() };
+const isZipFile = (f) => /\.zip$/i.test(f.name) || /zip/.test(f.type);
 
 function addFiles(files) {
   const list = [...files].filter((f) => f.size > 0);
   if (!list.length) return;
   if (up.active.size === 0 && up.queue.length === 0) {
-    Object.assign(up, { total: 0, done: 0, dups: 0, failed: 0, bytesTotal: 0, bytesDone: 0 });
+    Object.assign(up, { total: 0, done: 0, dups: 0, failed: 0, fromZip: 0, unpacking: 0, bytesTotal: 0, bytesDone: 0 });
     $('#upload-errors').replaceChildren();
   }
   up.queue.push(...list);
@@ -200,19 +201,30 @@ function pumpUploads() {
     const xhr = new XMLHttpRequest();
     up.active.add(xhr);
     up.inflight.set(xhr, 0);
+    const zip = isZipFile(file);
     xhr.upload.onprogress = (e) => { up.inflight.set(xhr, e.loaded); renderUpload(); };
+    // The server unpacks a zip after receiving it; say so instead of sitting at 100%.
+    let unpacking = false;
+    if (zip) xhr.upload.onload = () => { unpacking = true; up.unpacking++; renderUpload(); };
     xhr.onloadend = () => {
       up.active.delete(xhr);
       up.inflight.delete(xhr);
+      if (unpacking) up.unpacking--;
       up.bytesDone += file.size;
       up.done++;
-      let res = null;
-      try { res = JSON.parse(xhr.responseText)[0]; } catch {}
+      let results = null;
+      try { results = JSON.parse(xhr.responseText); } catch {}
       if (xhr.status === 0) uploadError(file.name, 'cancelled or connection lost');
-      else if (!res || res.error) uploadError(file.name, res?.error || `HTTP ${xhr.status}`);
+      else if (!Array.isArray(results) || !results.length) uploadError(file.name, results?.error || `HTTP ${xhr.status}`);
       else {
-        if (res.duplicate) up.dups++;
-        if (res.photo) upsertPhoto(res.photo);
+        for (const res of results) {
+          // Photos from a zip are labelled "archive.zip › photo.jpg"; a zip-level error is just "archive.zip".
+          const label = res.zip && res.name !== res.zip ? `${res.zip} › ${res.name}` : res.name || file.name;
+          if (res.error) { uploadError(label, res.error); continue; }
+          if (res.zip) up.fromZip++;
+          if (res.duplicate) up.dups++;
+          if (res.photo) upsertPhoto(res.photo);
+        }
       }
       renderUpload();
       pumpUploads();
@@ -237,6 +249,8 @@ function renderUpload() {
   $('#upload-bar').style.width = pct.toFixed(1) + '%';
   const busy = up.active.size + up.queue.length > 0;
   let t = `${busy ? 'Uploading' : 'Uploaded'} ${up.done} of ${up.total}`;
+  if (up.unpacking) t += ` · unpacking ${up.unpacking} zip${up.unpacking === 1 ? '' : 's'}…`;
+  if (up.fromZip) t += ` · ${up.fromZip} photo${up.fromZip === 1 ? '' : 's'} from zips`;
   if (up.dups) t += ` · ${up.dups} already uploaded`;
   if (up.failed) t += ` · ${up.failed} failed`;
   t += ` · ${fmtBytes(up.bytesDone + inflight)} / ${fmtBytes(up.bytesTotal)}`;

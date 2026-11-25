@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -98,6 +99,7 @@ type uploadResult struct {
 	Duplicate bool   `json:"duplicate,omitempty"`
 	Error     string `json:"error,omitempty"`
 	Photo     *Photo `json:"photo,omitempty"`
+	Zip       string `json:"zip,omitempty"` // set for photos that came from a zip archive
 }
 
 var allowedTypes = map[string]string{
@@ -127,7 +129,7 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 			part.Close()
 			continue
 		}
-		results = append(results, a.saveUpload(part))
+		results = append(results, a.saveUpload(part)...)
 		part.Close()
 	}
 	status := http.StatusOK
@@ -137,28 +139,42 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, status, results)
 }
 
-func (a *App) saveUpload(part *multipart.Part) uploadResult {
+// saveUpload stores one uploaded file. A zip archive yields one result per
+// photo inside it; anything else yields a single result.
+func (a *App) saveUpload(part *multipart.Part) []uploadResult {
 	name := filepath.Base(part.FileName())
-	res := uploadResult{Name: name}
+	head, err := readHead(part)
+	if err != nil {
+		return []uploadResult{{Name: name, Error: err.Error()}}
+	}
+	if isZip(head, name) {
+		return a.saveZip(name, io.MultiReader(bytes.NewReader(head), part))
+	}
+	return []uploadResult{a.savePhoto(name, head, part)}
+}
+
+var errEmptyFile = errors.New("empty file")
+
+// readHead reads the first 512 bytes, enough to sniff the content type.
+func readHead(r io.Reader) ([]byte, error) {
 	head := make([]byte, 512)
-	n, err := io.ReadFull(part, head)
+	n, err := io.ReadFull(r, head)
 	if errors.Is(err, io.EOF) {
-		res.Error = "empty file"
-		return res
+		return nil, errEmptyFile
 	}
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
-		res.Error = "read failed: " + err.Error()
-		return res
+		return nil, errors.New("read failed: " + err.Error())
 	}
-	head = head[:n]
+	return head[:n], nil
+}
+
+// savePhoto hashes the photo to a temp file while copying it (head has
+// already been read from r), then adds it to the store unless it's a duplicate.
+func (a *App) savePhoto(name string, head []byte, r io.Reader) uploadResult {
+	res := uploadResult{Name: name}
 	ext, ok := allowedTypes[http.DetectContentType(head)]
 	if !ok {
-		lower := strings.ToLower(name)
-		if strings.HasSuffix(lower, ".heic") || strings.HasSuffix(lower, ".heif") {
-			res.Error = "HEIC is not supported; export as JPEG (on iPhone: Settings → Camera → Formats → Most Compatible)"
-		} else {
-			res.Error = "not a supported image (JPEG, PNG, GIF, WebP, BMP)"
-		}
+		res.Error = unsupportedReason(name)
 		a.Log.Warn("upload rejected", "name", name, "reason", res.Error)
 		return res
 	}
@@ -173,7 +189,7 @@ func (a *App) saveUpload(part *multipart.Part) uploadResult {
 	mw := io.MultiWriter(tmp, h)
 	mw.Write(head)
 	limit := a.Cfg.MaxUploadMB << 20
-	copied, err := io.Copy(mw, io.LimitReader(part, limit))
+	copied, err := io.Copy(mw, io.LimitReader(r, limit))
 	size := copied + int64(len(head))
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
@@ -208,6 +224,14 @@ func (a *App) saveUpload(part *multipart.Part) uploadResult {
 	a.Proc.Enqueue(id)
 	a.Log.Info("photo uploaded", "name", name, "id", id, "bytes", size)
 	return res
+}
+
+func unsupportedReason(name string) string {
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, ".heic") || strings.HasSuffix(lower, ".heif") {
+		return "HEIC is not supported; export as JPEG (on iPhone: Settings → Camera → Formats → Most Compatible)"
+	}
+	return "not a supported image (JPEG, PNG, GIF, WebP, BMP)"
 }
 
 func (a *App) deleteOne(w http.ResponseWriter, r *http.Request) {

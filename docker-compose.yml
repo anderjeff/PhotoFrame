@@ -22,6 +22,7 @@ services:
       # FRAME_WIDTH: "1920"     # override the frame's reported resolution
       # FRAME_HEIGHT: "1080"
       # SYNC_INTERVAL: 15s
-      # MAX_UPLOAD_MB: "200"
+      # MAX_UPLOAD_MB: "200"    # per photo, including each photo inside a zip
+      # MAX_ZIP_MB: "4096"      # per zip upload; the zip is unpacked in /data/tmp, so leave that much free space
     # If the NAS requires a specific owner for the data folder, run as that user:
     # user: "1026:100"

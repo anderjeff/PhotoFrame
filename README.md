@@ -52,5 +52,6 @@ The install script downloads from public GitHub Releases. If the repository is p
 - **Logs**: the web UI's *Logs* tab shows the server log, the frame's live log, and the frame's systemd journal (which survives restarts and crashes). Set `LOG_LEVEL=debug` on either side for per-photo decode and fade timings.
 - **On the Pi**: `journalctl -u photoframe -f`, `systemctl status photoframe`.
 - **Frame offline in the UI**: check `FRAME_URL` and that `FRAME_TOKEN` matches on both sides. `curl http://<pi>:8080/api/health` should return `ok`.
+- **Adding a big batch from Google Photos**: on photos.google.com (or in the app), select the photos and choose **Download**. Upload the resulting `.zip` as is; the server unpacks it and adds every photo inside. Videos and `.json` files in the zip are skipped. On a phone this avoids the photo picker, which downloads cloud photos one by one and can stall on large selections.
 - **HEIC photos** aren't supported. iPhones usually convert to JPEG when uploading through the browser; otherwise set Camera → Formats → Most Compatible.
 - You can also copy `.jpg`/`.png` files directly into `/var/lib/photoframe/photos`. They are picked up within a minute, scaled on the Pi, and never touched by sync.

@@ -23,7 +23,8 @@ type Config struct {
 	JPEGQuality  int           // JPEG_QUALITY for display renditions
 	Background   string        // BACKGROUND: "blur" or "black"; only the default until a background is saved in the web UI
 	SyncInterval time.Duration // SYNC_INTERVAL: periodic reconcile with the frame
-	MaxUploadMB  int64         // MAX_UPLOAD_MB per file
+	MaxUploadMB  int64         // MAX_UPLOAD_MB per photo (also per photo inside a zip)
+	MaxZipMB     int64         // MAX_ZIP_MB per zip archive
 	LogLevel     slog.Level    // LOG_LEVEL
 }
 
@@ -56,6 +57,7 @@ func ConfigFromEnv() Config {
 		Background:   str("BACKGROUND", "blur"),
 		SyncInterval: interval,
 		MaxUploadMB:  int64(num("MAX_UPLOAD_MB", 200)),
+		MaxZipMB:     int64(num("MAX_ZIP_MB", 4096)),
 		LogLevel:     logx.ParseLevel(os.Getenv("LOG_LEVEL"), slog.LevelInfo),
 	}
 	c.Workers = max(c.Workers, 1)

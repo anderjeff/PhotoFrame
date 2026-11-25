@@ -34,6 +34,7 @@ button.danger { color: var(--err); }
 
 .drop { display: block; border: 2px dashed var(--border); border-radius: 12px; padding: 28px; text-align: center; cursor: pointer; color: var(--muted); margin-bottom: 14px; background: var(--surface); }
 .drop.over { border-color: var(--accent); color: var(--text); }
+.drop .hint { display: block; font-size: 12px; margin-top: 4px; }
 .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
 .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
 .errors { color: var(--err); margin: 8px 0 0; padding-left: 18px; max-height: 140px; overflow: auto; }
