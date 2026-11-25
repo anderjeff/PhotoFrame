@@ -3,7 +3,7 @@
 A fast, self-hosted digital photo frame made of two Go programs:
 
 - **Frame** (`cmd/frame`, runs on a Raspberry Pi 3): shows photos from the SD card by drawing directly to the Linux framebuffer. It needs no desktop, X server or browser. Photos arrive already sized for the screen, and the next one is decoded in the background, so changing photos is instant.
-- **Server** (`cmd/server`, runs in Docker on the NAS): a web UI for bulk uploads, image processing (EXIF rotation, resizing to the frame's exact resolution, a blurred-photo or solid-color fill around photos that don't match the screen's shape, adjustable in the UI), sync to the frame, and logs from both sides.
+- **Server** (`cmd/server`, runs in Docker on the NAS): a web UI for bulk uploads, image processing (EXIF rotation, resizing to the frame's exact resolution, a blurred-photo or solid-color fill around photos that don't match the screen's shape, adjustable in the UI), sync to the frame, and logs from both sides. An optional **On this day** mode (Frame tab) regularly shows photos taken around today's date in earlier years, using the date stored in each photo's EXIF data.
 
 ```
  Browser ──upload──▶ Server (NAS, Docker) ──HTTP push──▶ Frame (Pi) ──▶ /dev/fb0

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -77,6 +78,8 @@ type Syncer struct {
 	interval time.Duration
 	autoSize bool
 	trigger  chan struct{}
+
+	featErr string // last error sending Featured; owned by Run
 
 	mu     sync.Mutex
 	status FrameStatus
@@ -209,6 +212,7 @@ func (s *Syncer) syncOnce(ctx context.Context) {
 	if len(push) > 0 {
 		s.pushAll(ctx, push)
 	}
+	s.syncFeatured(ctx, info.FeaturedKey)
 	s.update(func(st *FrameStatus) { st.LastSync, st.PendingPush, st.Syncing = time.Now(), 0, false })
 }
 
@@ -268,6 +272,25 @@ func (s *Syncer) pushOne(ctx context.Context, p Photo) error {
 		return err
 	}
 	return s.client.call(ctx, "PUT", "/api/photos/"+p.ID+"?rev="+p.Rev, f, st.Size(), nil)
+}
+
+// syncFeatured sends the "On this day" pick when the frame's copy differs.
+// A restarted frame reports an empty key and gets it again.
+func (s *Syncer) syncFeatured(ctx context.Context, have string) {
+	f := s.store.Featured(time.Now())
+	if f.Key == have || (have == "" && len(f.IDs) == 0) {
+		return
+	}
+	body, _ := json.Marshal(f)
+	if err := s.client.call(ctx, "PUT", "/api/featured", bytes.NewReader(body), int64(len(body)), nil); err != nil {
+		if msg := err.Error(); msg != s.featErr {
+			s.featErr = msg
+			s.log.Warn("sending On this day photos to the frame failed; the frame may need updating", "err", err)
+		}
+		return
+	}
+	s.featErr = ""
+	s.log.Info("on this day sent to frame", "photos", len(f.IDs), "key", f.Key)
 }
 
 func (s *Syncer) setOffline(err error) {

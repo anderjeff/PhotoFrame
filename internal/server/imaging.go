@@ -2,7 +2,6 @@ package server
 
 import (
 	"bufio"
-	"encoding/binary"
 	"image"
 	"image/draw"
 	"image/jpeg"
@@ -11,78 +10,6 @@ import (
 
 	xdraw "golang.org/x/image/draw"
 )
-
-// exifOrientation returns the EXIF orientation (1-8) of a JPEG, or 1 if absent.
-func exifOrientation(b []byte) int {
-	if len(b) < 4 || b[0] != 0xFF || b[1] != 0xD8 {
-		return 1
-	}
-	for i := 2; i+4 <= len(b); {
-		if b[i] != 0xFF {
-			return 1
-		}
-		marker := b[i+1]
-		switch {
-		case marker == 0xFF: // fill byte
-			i++
-			continue
-		case marker == 0xDA || marker == 0xD9: // start of scan / end of image
-			return 1
-		case marker >= 0xD0 && marker <= 0xD7 || marker == 0x01: // standalone markers
-			i += 2
-			continue
-		}
-		segLen := int(b[i+2])<<8 | int(b[i+3])
-		if segLen < 2 || i+2+segLen > len(b) {
-			return 1
-		}
-		seg := b[i+4 : i+2+segLen]
-		if marker == 0xE1 && len(seg) >= 6 && string(seg[:6]) == "Exif\x00\x00" {
-			if o := tiffOrientation(seg[6:]); o >= 1 && o <= 8 {
-				return o
-			}
-			return 1
-		}
-		i += 2 + segLen
-	}
-	return 1
-}
-
-func tiffOrientation(t []byte) int {
-	if len(t) < 8 {
-		return 0
-	}
-	var bo binary.ByteOrder
-	switch string(t[:2]) {
-	case "II":
-		bo = binary.LittleEndian
-	case "MM":
-		bo = binary.BigEndian
-	default:
-		return 0
-	}
-	if bo.Uint16(t[2:]) != 42 {
-		return 0
-	}
-	off := int(bo.Uint32(t[4:]))
-	if off < 8 || off+2 > len(t) {
-		return 0
-	}
-	n := int(bo.Uint16(t[off:]))
-	for k := 0; k < n; k++ {
-		e := off + 2 + k*12
-		if e+12 > len(t) {
-			return 0
-		}
-		if bo.Uint16(t[e:]) == 0x0112 {
-			if bo.Uint16(t[e+2:]) != 3 { // SHORT
-				return 0
-			}
-			return int(bo.Uint16(t[e+8:]))
-		}
-	}
-	return 0
-}
 
 // fitSize returns the largest size with w:h aspect that fits in maxW×maxH.
 func fitSize(w, h, maxW, maxH int) (int, int) {

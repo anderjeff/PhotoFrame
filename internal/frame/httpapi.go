@@ -47,6 +47,15 @@ func (a *API) Handler() http.Handler {
 		api.WriteJSON(w, http.StatusOK, a.Show.Settings())
 	})
 	m.HandleFunc("PUT /api/settings", a.putSettings)
+	m.HandleFunc("PUT /api/featured", func(w http.ResponseWriter, r *http.Request) {
+		var f api.Featured
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&f); err != nil {
+			api.WriteError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+		a.Show.SetFeatured(f)
+		w.WriteHeader(http.StatusNoContent)
+	})
 	m.HandleFunc("POST /api/control/{action}", func(w http.ResponseWriter, r *http.Request) {
 		if err := a.Show.Control(r.PathValue("action")); err != nil {
 			api.WriteError(w, http.StatusBadRequest, err.Error())
@@ -76,7 +85,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 		PhotoCount: a.Store.Count(), Current: cur, Paused: paused,
 		UptimeSeconds: int64(time.Since(a.Started).Seconds()),
 		CPUTempC:      cpuTemp(), DiskFreeBytes: free, DiskTotalBytes: total, MemAvailBytes: memAvailable(),
-		Settings: a.Show.Settings(),
+		Settings: a.Show.Settings(), FeaturedKey: a.Show.FeaturedKey(),
 	})
 }
 

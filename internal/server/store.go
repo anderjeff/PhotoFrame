@@ -31,14 +31,17 @@ type Photo struct {
 	UploadedAt time.Time `json:"uploadedAt"`
 	Status     string    `json:"status"`
 	Error      string    `json:"error,omitempty"`
-	Rev        string    `json:"rev,omitempty"` // rendition currently in display/
-	Synced     bool      `json:"synced"`        // frame has this exact rendition
+	Rev        string    `json:"rev,omitempty"`      // rendition currently in display/
+	Synced     bool      `json:"synced"`             // frame has this exact rendition
+	TakenAt    time.Time `json:"takenAt,omitzero"`   // from EXIF; wall clock stored as UTC
+	DateRead   bool      `json:"dateRead,omitempty"` // TakenAt has been looked up
 }
 
 type indexFile struct {
 	DisplayW   int         `json:"displayW"`
 	DisplayH   int         `json:"displayH"`
 	Background *Background `json:"background,omitempty"` // nil until set in the UI
+	OnThisDay  *OnThisDay  `json:"onThisDay,omitempty"`  // nil until set in the UI
 	Photos     []*Photo    `json:"photos"`
 }
 
@@ -55,6 +58,7 @@ type Store struct {
 	displayH int
 	bg       *Background // saved from the UI; nil means defBg
 	defBg    Background
+	otd      OnThisDay
 	dirty    chan struct{}
 }
 
@@ -70,7 +74,7 @@ func OpenStore(dir string, log *slog.Logger, events *Broker) (*Store, error) {
 		}
 	}
 	s := &Store{dir: dir, log: log, events: events, photos: map[string]*Photo{},
-		displayW: 1920, displayH: 1080, defBg: DefaultBackground(""), dirty: make(chan struct{}, 1)}
+		displayW: 1920, displayH: 1080, defBg: DefaultBackground(""), otd: DefaultOnThisDay(), dirty: make(chan struct{}, 1)}
 	b, err := os.ReadFile(s.indexPath())
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -89,6 +93,10 @@ func OpenStore(dir string, log *slog.Logger, events *Broker) (*Store, error) {
 		}
 		if idx.Background != nil && idx.Background.Normalize() == nil {
 			s.bg = idx.Background
+		}
+		if idx.OnThisDay != nil {
+			s.otd = *idx.OnThisDay
+			s.otd.Normalize()
 		}
 	}
 	return s, nil
@@ -126,7 +134,8 @@ func (s *Store) RunSaver(ctx context.Context) {
 
 func (s *Store) save() {
 	s.mu.RLock()
-	idx := indexFile{DisplayW: s.displayW, DisplayH: s.displayH, Background: s.bg, Photos: make([]*Photo, 0, len(s.photos))}
+	otd := s.otd
+	idx := indexFile{DisplayW: s.displayW, DisplayH: s.displayH, Background: s.bg, OnThisDay: &otd, Photos: make([]*Photo, 0, len(s.photos))}
 	for _, p := range s.photos {
 		cp := *p
 		idx.Photos = append(idx.Photos, &cp)

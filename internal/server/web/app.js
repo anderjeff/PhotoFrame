@@ -314,6 +314,7 @@ async function enterFrameTab() {
   renderInfo();
   refreshScreen();
   if (!bg.saved) loadBackground();
+  otdLoad();
   clearInterval(screenTimer);
   screenTimer = setInterval(() => { if (state.tab === 'frame') refreshScreen(); else clearInterval(screenTimer); }, 4000);
   try {
@@ -408,6 +409,66 @@ bgForm.addEventListener('submit', async (e) => {
     const n = res.rerendering;
     $('#bg-msg').textContent = n ? `Saved. Re-rendering ${n} photo${n === 1 ? '' : 's'}…` : 'Saved';
   } catch (err) { $('#bg-msg').textContent = 'Failed: ' + err.message; }
+});
+
+/* ---------- on this day ---------- */
+const otd = { saved: null, seq: 0 };
+const otdForm = $('#otd');
+const browserTZ = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
+
+function otdValues() {
+  const f = otdForm.elements;
+  return { enabled: f.enabled.checked, windowDays: +f.windowDays.value, repeatMinutes: +f.repeatMinutes.value, timeZone: browserTZ() };
+}
+function otdFill(s) {
+  const f = otdForm.elements;
+  f.enabled.checked = s.enabled; f.windowDays.value = String(s.windowDays); f.repeatMinutes.value = String(s.repeatMinutes);
+}
+function otdDirty() {
+  if (!otd.saved) return false;
+  const v = otdValues(), s = otd.saved;
+  return v.enabled !== s.enabled || v.windowDays !== s.windowDays || v.repeatMinutes !== s.repeatMinutes;
+}
+function otdRender(st) {
+  const day = new Date(st.today + 'T12:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+  const n = st.photos.length;
+  const years = [...new Set(st.photos.map((p) => new Date(p.takenAt).getUTCFullYear()))].sort();
+  let text = n ? `${n} photo${n === 1 ? '' : 's'} for ${day}, from ${years.join(', ')}.` : `No photos match ${day} yet.`;
+  if (st.total) text += ` ${st.dated} of ${st.total} photos have a date taken.`;
+  if (st.photos.some((p) => !p.onFrame)) text += ' Some are still being sent to the frame.';
+  $('#otd-summary').textContent = text;
+  const shown = st.photos.slice(0, 24);
+  $('#otd-grid').innerHTML = shown.map((p) => {
+    const taken = new Date(p.takenAt).toLocaleDateString(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' });
+    const ago = `${p.yearsAgo} year${p.yearsAgo === 1 ? '' : 's'} ago`;
+    return `<div class="tile" title="${esc(p.name)}&#10;Taken ${esc(taken)}"><img loading="lazy" alt="" src="/api/photos/${p.id}/thumb"><span class="badge">${esc(ago)}</span></div>`;
+  }).join('') + (n > shown.length ? `<div class="tile"><div class="ph">+${n - shown.length} more</div></div>` : '');
+}
+async function otdLoad() {
+  const seq = ++otd.seq;
+  try {
+    if (!otd.saved) {
+      const st = await api('/api/onthisday');
+      if (seq !== otd.seq) return;
+      otd.saved = st.settings;
+      otdFill(st.settings);
+    }
+    const v = otdValues();
+    const st = await api(`/api/onthisday?windowDays=${v.windowDays}&timeZone=${encodeURIComponent(v.timeZone)}`);
+    if (seq !== otd.seq) return;
+    otdRender(st);
+    $('#otd-msg').textContent = otdDirty() ? 'Not saved' : '';
+  } catch (e) { $('#otd-msg').textContent = 'Failed to load: ' + e.message; }
+}
+otdForm.addEventListener('input', otdLoad);
+otdForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const st = await api('/api/onthisday', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(otdValues()) });
+    otd.saved = st.settings;
+    otdRender(st);
+    $('#otd-msg').textContent = st.settings.enabled ? 'Saved. The frame picks it up within a few seconds.' : 'Saved (off)';
+  } catch (err) { $('#otd-msg').textContent = 'Failed: ' + err.message; }
 });
 
 $$('[data-ctl]').forEach((b) => b.addEventListener('click', async () => {

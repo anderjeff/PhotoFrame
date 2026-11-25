@@ -62,6 +62,8 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/background", a.getBackground)
 	m.HandleFunc("PUT /api/background", a.putBackground)
 	m.HandleFunc("GET /api/background/preview", a.previewBackground)
+	m.HandleFunc("GET /api/onthisday", a.getOnThisDay)
+	m.HandleFunc("PUT /api/onthisday", a.putOnThisDay)
 
 	// Frame passthroughs, so the browser only ever talks to the server.
 	m.HandleFunc("GET /api/frame/info", a.proxy("/api/info"))

@@ -76,3 +76,5 @@ output { min-width: 3em; text-align: right; color: var(--muted); }
 .swatches button.on { border-color: var(--accent); }
 input[type=color] { width: 40px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
 #bg-preview { margin: 4px 0 10px; }
+.grid.mini { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; margin-bottom: 10px; }
+.grid.mini .tile { cursor: default; }

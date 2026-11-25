@@ -37,11 +37,13 @@ const (
 	evRemoved
 	evReplaced
 	evSettings
+	evFeatured
 )
 
 type event struct {
 	kind evKind
 	keys []string
+	dur  time.Duration
 }
 
 type prefetch struct {
@@ -65,6 +67,10 @@ type Slideshow struct {
 
 	// Owned by Run.
 	fresh      []string // newly received photos, shown before the regular queue
+	featured   []string // "On this day" photos, shown as a group every featRepeat
+	featQ      []string // the rest of the group currently being shown
+	featNext   time.Time
+	featRepeat time.Duration // 0 = once per Featured
 	queue      []string
 	history    []string
 	bad        map[string]bool
@@ -78,6 +84,7 @@ type Slideshow struct {
 	paused   bool
 	curFrame *Frame
 	shownAt  time.Time
+	featKey  string
 }
 
 // NewSlideshow loads settings from settingsPath (defaults if missing).
@@ -110,6 +117,23 @@ func (s *Slideshow) StoreChanged(added, removed []string) {
 // StoreReplaced is wired to Store.SetOnReplace.
 func (s *Slideshow) StoreReplaced(key string) {
 	s.events <- event{kind: evReplaced, keys: []string{key}}
+}
+
+// SetFeatured replaces the "On this day" group. The group starts with the
+// next photo and repeats every RepeatMinutes.
+func (s *Slideshow) SetFeatured(f api.Featured) {
+	ids := slices.DeleteFunc(slices.Clone(f.IDs), func(id string) bool { return !api.ValidID(id) })
+	s.events <- event{kind: evFeatured, keys: ids, dur: time.Duration(max(f.RepeatMinutes, 0)) * time.Minute}
+	s.mu.Lock()
+	s.featKey = f.Key
+	s.mu.Unlock()
+}
+
+// FeaturedKey is the key of the last SetFeatured.
+func (s *Slideshow) FeaturedKey() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.featKey
 }
 
 // Control handles "next", "prev", "pause", "resume".
@@ -233,6 +257,14 @@ func (s *Slideshow) handle(ev event, reset func(), resetIn func(time.Duration)) 
 			resetIn(time.Second)
 		}
 		s.ensurePrefetch()
+	case evFeatured:
+		s.featured, s.featRepeat, s.featQ, s.featNext = ev.keys, ev.dur, nil, time.Time{}
+		s.log.Info("on this day updated", "photos", len(ev.keys), "repeat", ev.dur)
+		if p := s.pre; p != nil {
+			<-p.done // drop the prefetched regular photo so the group starts next
+			s.pre = nil
+		}
+		s.ensurePrefetch()
 	case evReplaced:
 		// The photo stays in rotation; only decoded copies of the old file are stale.
 		k := ev.keys[0]
@@ -261,6 +293,8 @@ func (s *Slideshow) handle(ev event, reset func(), resetIn func(time.Duration)) 
 		}
 		notGone := func(k string) bool { return gone[k] }
 		s.fresh = slices.DeleteFunc(s.fresh, notGone)
+		s.featured = slices.DeleteFunc(s.featured, notGone)
+		s.featQ = slices.DeleteFunc(s.featQ, notGone)
 		s.queue = slices.DeleteFunc(s.queue, notGone)
 		s.history = slices.DeleteFunc(s.history, notGone)
 		if s.pre != nil && gone[s.pre.key] {
@@ -307,7 +341,15 @@ func (s *Slideshow) refill(cur string) {
 }
 
 func (s *Slideshow) nextKey(cur string, pop bool) string {
-	for _, q := range []*[]string{&s.fresh, &s.queue} {
+	if len(s.featQ) == 0 && len(s.featured) > 0 && !time.Now().Before(s.featNext) {
+		s.featQ = slices.Clone(s.featured)
+		s.featNext = time.Now().Add(s.featRepeat)
+		if s.featRepeat <= 0 {
+			s.featNext = time.Now().AddDate(100, 0, 0)
+		}
+		s.log.Info("showing On this day photos", "photos", len(s.featQ))
+	}
+	for _, q := range []*[]string{&s.fresh, &s.featQ, &s.queue} {
 		for len(*q) > 0 {
 			k := (*q)[0]
 			if s.valid(k) && k != cur {

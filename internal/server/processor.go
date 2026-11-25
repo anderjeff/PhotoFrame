@@ -104,6 +104,7 @@ func (p *Processor) process(id string) {
 		return
 	}
 	orientation := exifOrientation(data)
+	taken := exifDateTaken(data)
 	img, format, err := image.Decode(bytes.NewReader(data))
 	data = nil
 	if err != nil {
@@ -134,6 +135,7 @@ func (p *Processor) process(id string) {
 	p.store.Update(id, func(x *Photo) {
 		x.Status, x.Error, x.Rev, x.Width, x.Height = StatusReady, "", rev, srcW, srcH
 		x.Synced = false
+		x.TakenAt, x.DateRead = taken, true
 	})
 	p.log.Info("photo processed", "id", id, "name", ph.Name, "format", format,
 		"src", fmt.Sprintf("%dx%d", srcW, srcH), "orientation", orientation, "rev", rev,

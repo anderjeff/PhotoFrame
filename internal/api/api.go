@@ -52,6 +52,15 @@ type FrameInfo struct {
 	DiskTotalBytes uint64   `json:"diskTotalBytes"`
 	MemAvailBytes  uint64   `json:"memAvailBytes"`
 	Settings       Settings `json:"settings"`
+	FeaturedKey    string   `json:"featuredKey,omitempty"` // key of the last Featured received
+}
+
+// Featured is the server's "On this day" pick (PUT /api/featured). The frame
+// shows these photos as a group, then again every RepeatMinutes.
+type Featured struct {
+	Key           string   `json:"key"`           // changes whenever the pick does, e.g. each day
+	IDs           []string `json:"ids"`           // in display order
+	RepeatMinutes int      `json:"repeatMinutes"` // 0 = show the group once
 }
 
 // ManifestEntry describes one server-managed photo stored on the frame.

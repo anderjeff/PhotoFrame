@@ -30,11 +30,12 @@ One Go module (`photoframe`) with two programs. They talk only over HTTP. Shared
 - `processor.go` + `imaging.go`: worker pool that renders each original into an image of **exactly the frame's resolution** (EXIF orientation, CatmullRom scaling, background fill from `background.go`). It scales before rotating to avoid full-resolution rotation work. Output goes to `display/<id>.jpg` and `thumbs/<id>.jpg`.
 - `sync.go`: `Syncer` reconciles the server's photo set with the frame's manifest. It runs on a timer and immediately (debounced) when triggered by processing or deletes. It pushes newest uploads first and deletes photos the server no longer has.
 - `store.go`: in-memory index persisted to `DATA_DIR/index.json` (debounced). `events.go` broadcasts changes to the UI over SSE.
+- `onthisday.go`: "On this day". Each photo's `TakenAt` comes from EXIF (`exif.go`), read during processing or by `BackfillDates` at startup. The syncer sends today's matches (only photos already on the frame) as an `api.Featured` to `PUT /api/featured`. The frame echoes the `featuredKey` in `/api/info`, so the list is resent when the day or the matches change, or after the frame restarts. "Today" uses the browser's time zone, saved with the settings (tzdata is embedded).
 
 **Frame (`cmd/frame`, `internal/frame`)**: runs on a Raspberry Pi 3 as a systemd service (installed by `scripts/install-frame.sh`).
 - `display_linux.go`: mmaps `/dev/fb0` via ioctls and switches `/dev/tty1` to `KD_GRAPHICS`. If the framebuffer can't be opened, or on non-Linux systems, it falls back to `Headless`, so the API and logs stay reachable.
 - `pixels.go`: `Frame` holds pixels in the **display's native format**, so showing one is a memcpy. JPEG `YCbCr` is converted straight to that format, split across all cores. Fades blend native buffers.
-- `slideshow.go`: a single `Run` goroutine owns all playlist state (`fresh` queue for new arrivals → shuffled `queue` → `history`). Everything else sends it `event`s. It keeps one background prefetch at a time, so the next photo is ready before it's shown.
+- `slideshow.go`: a single `Run` goroutine owns all playlist state (`fresh` queue for new arrivals → `featQ`, the "On this day" group replayed every `featRepeat` → shuffled `queue` → `history`). Everything else sends it `event`s. It keeps one background prefetch at a time, so the next photo is ready before it's shown.
 - `store.go`: files in `DATA_DIR/photos`. Server-managed files are named `<id>_<rev>.jpg`. Other `.jpg`/`.png` files placed by hand are shown but never synced or deleted. Writes are atomic (temp file → fsync → rename).
 - `httpapi.go`: token-protected API (`X-PhotoFrame-Token`) used by the server: manifest, PUT/DELETE photos, settings, control, logs, journal, screenshot.
 

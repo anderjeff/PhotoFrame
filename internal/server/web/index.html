@@ -98,6 +98,7 @@
         </form>
       </div>
       </div>
+      <div>
       <div class="card">
         <h2>Slideshow settings</h2>
         <form id="settings">
@@ -112,6 +113,35 @@
         </form>
         <h2>Status</h2>
         <table id="info" class="kv"></table>
+      </div>
+      <div class="card">
+        <h2>On this day</h2>
+        <p class="muted small">Shows your photos taken around today's date in earlier years as a group, then returns to the regular slideshow. It uses the date taken that phones and cameras store in each photo.</p>
+        <form id="otd">
+          <label class="check"><input type="checkbox" name="enabled"> Turn on</label>
+          <label>Match photos taken
+            <select name="windowDays">
+              <option value="0">on today's date</option>
+              <option value="1">within 1 day</option>
+              <option value="3">within 3 days</option>
+              <option value="7">within a week</option>
+              <option value="15">within 2 weeks</option>
+            </select>
+          </label>
+          <label>Show the group
+            <select name="repeatMinutes">
+              <option value="30">every 30 minutes</option>
+              <option value="60">every hour</option>
+              <option value="120">every 2 hours</option>
+              <option value="240">every 4 hours</option>
+              <option value="0">once a day</option>
+            </select>
+          </label>
+          <p id="otd-summary" class="muted small"></p>
+          <div id="otd-grid" class="grid mini"></div>
+          <div class="row"><button type="submit">Save</button><span id="otd-msg" class="muted"></span></div>
+        </form>
+      </div>
       </div>
     </div>
   </section>

@@ -69,6 +69,7 @@ func main() {
 	go func() { defer close(saverDone); store.RunSaver(ctx) }()
 	proc.Start(ctx)
 	go syncer.Run(ctx)
+	go server.BackfillDates(ctx, store, log)
 
 	app := &server.App{Cfg: cfg, Log: log, Ring: ring, Store: store, Proc: proc, Sync: syncer, Events: events}
 	srv := &http.Server{Addr: cfg.Listen, Handler: app.Handler(), ReadHeaderTimeout: 10 * time.Second}
